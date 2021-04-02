@@ -18,10 +18,14 @@
 		<database>Communication_LTD</database>
 	</db>
 	<ssl>
+		<enable>true</enable> <!-- SSL enable/disable -->
+		<port>8443</port> <!-- Server port -->
+		<enabledProtocols>TLSv1.2</enabledProtocols> <!-- Protocols for use, seperate each one by ',' -->
+		<keyStore>classpath:tls/certificate.p12</keyStore> <!-- Key store file path -->
 		<keyStoreType>PKCS12</keyStoreType> <!-- Key store type -->
-		<keyStore>classpath:keystore/communication_ltd.p12</keyStore> <!-- Key store file path -->
 		<keyStorePassword>ofir_tamir_yevgeni</keyStorePassword> <!-- Key store password -->
 		<keyAlias>cohen_hazut_kuznetsov</keyAlias> <!-- Key alias -->
+		<keyPassword>ofir_tamir_yevgeni</keyPassword>
 	</ssl>
 </configurations>
 
