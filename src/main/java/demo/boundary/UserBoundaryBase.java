@@ -1,16 +1,16 @@
-package demo.config;
+package demo.boundary;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import lombok.ToString;
+import lombok.experimental.SuperBuilder;
 
 @AllArgsConstructor
 @NoArgsConstructor
 @Getter
 @Setter
-@ToString
-public class General {
-	private boolean secure;
+@SuperBuilder
+public class UserBoundaryBase {
+	private String username;
 }

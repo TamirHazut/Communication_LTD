@@ -1,9 +1,9 @@
 package demo.data.repository;
 
-import org.springframework.data.repository.CrudRepository;
+import org.springframework.data.repository.PagingAndSortingRepository;
 
 import demo.data.UserEntity;
 
-public interface UserRepository extends CrudRepository<UserEntity, String> {
+public interface UserRepository extends PagingAndSortingRepository<UserEntity, String> {
 
 }

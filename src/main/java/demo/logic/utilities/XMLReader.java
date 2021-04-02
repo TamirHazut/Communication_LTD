@@ -1,4 +1,4 @@
-package demo.logic.util;
+package demo.logic.utilities;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.ResourceUtils;
 
 import demo.config.Configurations;
-import demo.logic.exception.InvalidFileException;
+import demo.logic.exceptions.InvalidFileException;
 
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBElement;

@@ -1,4 +1,4 @@
-package demo.logic.exception;
+package demo.logic.exceptions;
 
 public class InvalidFileException extends RuntimeException {
 	/**

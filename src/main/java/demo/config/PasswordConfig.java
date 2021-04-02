@@ -11,7 +11,7 @@ import lombok.ToString;
 @Getter
 @Setter
 @ToString
-public class Password {
+public class PasswordConfig {
 	private int length;
 	private String symbols;
 	private int history;

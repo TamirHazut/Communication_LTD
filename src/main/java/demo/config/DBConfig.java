@@ -14,7 +14,7 @@ import lombok.ToString;
 @Getter
 @Setter
 @ToString
-public class DB {
+public class DBConfig {
 	private String ip;
 	@Min(0)
 	@Max(65536)

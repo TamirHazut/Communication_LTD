@@ -25,6 +25,10 @@ dependencies {
 	compile group: 'org.projectlombok', name: 'lombok', version: '1.18.18'
 	annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
 	
+	// https://mvnrepository.com/artifact/org.springdoc/springdoc-openapi-ui
+	implementation group: 'org.springdoc', name: 'springdoc-openapi-ui', version: '1.5.6'
+	
+	
 	// https://mvnrepository.com/artifact/org.hibernate.validator/hibernate-validator
 	implementation group: 'org.hibernate.validator', name: 'hibernate-validator', version: '7.0.1.Final'
 	
