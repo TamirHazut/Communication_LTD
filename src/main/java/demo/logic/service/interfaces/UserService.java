@@ -13,6 +13,8 @@ public interface UserService {
 
 	UserBoundaryBase changePassword(UserBoundaryPasswordChange userBoundary);
 	
+	UserBoundaryBase forgotPassword(UserBoundaryBase userBoundary);
+	
 	UserBoundaryBase[] getAll();
 
 	void deleteAll();

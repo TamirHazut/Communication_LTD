@@ -16,9 +16,10 @@ import lombok.ToString;
 @ToString
 @XmlRootElement(name = "configurations")
 public class Configurations {
-	private GeneralConfig general;
-	private PasswordConfig password;
 	private DBConfig db;
+	private GeneralConfig general;
+	private MailConfig mail;
+	private PasswordConfig password;
 	private SSLConfig ssl; 
 	
 	@XmlElement(name = "db")
@@ -29,11 +30,14 @@ public class Configurations {
 	public void setGeneral(GeneralConfig general) {
 		this.general = general;
 	}
+	@XmlElement(name = "mail")
+	public void setMail(MailConfig mail) {
+		this.mail = mail;
+	}
 	@XmlElement(name = "password")
 	public void setPassword(PasswordConfig password) {
 		this.password = password;
 	}
-	
 	@XmlElement(name = "ssl")
 	public void setSSL(SSLConfig ssl) {
 		this.ssl = ssl;
@@ -44,14 +48,17 @@ public class Configurations {
 		List<Permission> permissions = Permission.getPermissions(permission);
 		for (Permission p : permissions) {
 			switch (p) {
+			case DB:
+				configurations.put(p, this.db);
+				break;
 			case GENERAL:
 				configurations.put(p, this.general);
 				break;
+			case MAIL:
+				configurations.put(p, this.mail);
+				break;
 			case PASSWORD:
 				configurations.put(p, this.password);
-				break;
-			case DB:
-				configurations.put(p, this.db);
 				break;
 			case SSL:
 				configurations.put(p, this.ssl);

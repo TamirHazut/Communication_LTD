@@ -2,6 +2,7 @@ package demo.rest;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
@@ -14,6 +15,7 @@ import demo.boundary.UserBoundarySignup;
 import demo.logic.service.interfaces.UserService;
 import lombok.AllArgsConstructor;
 
+@CrossOrigin(origins = "https://localhost:8443")
 @RestController
 @AllArgsConstructor(onConstructor = @__(@Autowired))
 public class UserController {
@@ -44,6 +46,15 @@ public class UserController {
 			produces = MediaType.APPLICATION_JSON_VALUE)
 	public UserBoundaryBase changePassword(@RequestBody UserBoundaryPasswordChange userBoundary) {
 		return this.userService.changePassword(userBoundary);	
+	}
+	
+	@RequestMapping(
+			path = "/forgotPassword",
+			method = RequestMethod.POST,
+			consumes = MediaType.APPLICATION_JSON_VALUE,
+			produces = MediaType.APPLICATION_JSON_VALUE)
+	public UserBoundaryBase forgotPassword(@RequestBody UserBoundaryBase userBoundary) {
+		return this.userService.forgotPassword(userBoundary);	
 	}
 	
 	@RequestMapping(

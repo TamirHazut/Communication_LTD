@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public enum Permission {
-	GENERAL(1), PASSWORD(2), DB(4), SSL(8);
+	DB(1 << 1), GENERAL(1 << 2), MAIL(1 << 3), PASSWORD(1 << 4), SSL(1 << 5);
 	
 	private long id;
 	

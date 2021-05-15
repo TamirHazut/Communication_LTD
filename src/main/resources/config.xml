@@ -1,15 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configurations>
-	<general>
-		<secure>true</secure>
-	</general>
-	<password>
-		<length>10</length> <!-- Password length -->
-		<symbols>^.*((?=(.*[A-Z]){1,})(?=(.*[a-z]){1,})(?=(.*[\d]){1,})(?=(.*[\W]){1,})(?!.*\s)).*$</symbols> <!-- Acceptable symbols to create a password, must be as Regex. see Regex options comment at end of file -->
-		<history>3</history> <!-- Number of old passwords to compare when changing to a new one -->
-		<dictionaryFile>C:\PasswordDictionary.txt</dictionaryFile>
-		<loginAttempts>50</loginAttempts> <!-- Number of attempts before denying login -->
-	</password>
 	<db>
 		<ip>192.168.31.101</ip>
 		<port>3306</port>
@@ -17,9 +7,27 @@
 		<password>MySQL</password>
 		<database>Communication_LTD</database>
 	</db>
+	<general>
+		<secure>true</secure>
+	</general>
+	<mail>
+		<host>smtp.gmail.com</host>
+		<port>587</port>
+		<username>communicationltdproject@gmail.com</username>
+		<password>Your Password</password>
+		<from>no-reply@communicationltd.com</from>
+		<resetPasswordHTMLTemplateFile>reset-password-message-template.ftlh</resetPasswordHTMLTemplateFile>
+	</mail>
+	<password>
+		<length>10</length> <!-- Password length -->
+		<symbols>^.*((?=(.*[A-Z]){1,})(?=(.*[a-z]){1,})(?=(.*[\d]){1,})(?=(.*[\W]){1,})(?!.*\s)).*$</symbols> <!-- Acceptable symbols to create a password, must be as Regex. see Regex options comment at end of file -->
+		<history>3</history> <!-- Number of old passwords to compare when changing to a new one -->
+		<dictionaryFile>C:\PasswordDictionary.txt</dictionaryFile>
+		<loginAttempts>50</loginAttempts> <!-- Number of attempts before denying login -->
+	</password>
 	<ssl>
 		<enable>true</enable> <!-- SSL enable/disable -->
-		<port>8443</port> <!-- Server port -->
+		<port>8444</port> <!-- Server port -->
 		<enabledProtocols>TLSv1.2</enabledProtocols> <!-- Protocols for use, seperate each one by ',' -->
 		<keyStore>classpath:tls/certificate.p12</keyStore> <!-- Key store file path -->
 		<keyStoreType>PKCS12</keyStoreType> <!-- Key store type -->

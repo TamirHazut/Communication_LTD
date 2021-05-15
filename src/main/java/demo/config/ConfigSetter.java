@@ -1,6 +1,7 @@
 package demo.config;
 
 import java.util.Map;
+import java.util.Properties;
 
 import javax.sql.DataSource;
 
@@ -12,6 +13,8 @@ import org.springframework.boot.web.server.Ssl;
 import org.springframework.boot.web.server.WebServerFactoryCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.JavaMailSenderImpl;
 
 import demo.logic.utilities.XMLReader;
 import lombok.AllArgsConstructor;
@@ -67,6 +70,27 @@ public class ConfigSetter implements WebServerFactoryCustomizer<TomcatServletWeb
 		dataSourceBuilder.username(dbConfig.getUser());
 		dataSourceBuilder.password(dbConfig.getPassword());
 		return dataSourceBuilder.build();
+	}
+	
+	@Bean
+	public JavaMailSender getJavaMailSender() {
+		Configurations configurations = xmlReader.loadConfigFile();
+		Map<Permission, Object> permissions = configurations.getConfigurations(Permission.MAIL.getId());
+		MailConfig mailConfig = (MailConfig) permissions.get(Permission.MAIL);
+	    JavaMailSenderImpl mailSender = new JavaMailSenderImpl();
+	    mailSender.setHost(mailConfig.getHost());
+	    mailSender.setPort(mailConfig.getPort());
+	    
+	    mailSender.setUsername(mailConfig.getUsername());
+	    mailSender.setPassword(mailConfig.getPassword());
+	    
+	    Properties props = mailSender.getJavaMailProperties();
+	    props.put("mail.transport.protocol", "smtp");
+	    props.put("mail.smtp.auth", "true");
+	    props.put("mail.smtp.starttls.enable", "true");
+	    props.put("mail.debug", "true");
+	    
+	    return mailSender;
 	}
 
 }

@@ -23,6 +23,8 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
+import com.github.curiousoddman.rgxgen.RgxGen;
+
 import demo.boundary.UserBoundaryBaseWithPassword;
 import demo.boundary.UserBoundaryPasswordChange;
 import demo.config.Configurations;
@@ -39,7 +41,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor(onConstructor = @__(@Autowired))
 public class PasswordManager {
 	public static final String BYTE_CHARSET = "ISO-8859-1";
-	private final long permissionsValue = Permission.PASSWORD.getId();
+	private final long PERMISSIONS_VALUE = Permission.PASSWORD.getId();
 	@Getter private PasswordConfig passwordConfig;
 	private @NonNull XMLReader xmlReader;
 	private @NonNull UserRepository userRepository;
@@ -58,12 +60,14 @@ public class PasswordManager {
 	}
 	
 	public void generateSaltValue(byte[] salt) {
-		random.nextBytes(salt);
+		do {
+			random.nextBytes(salt);
+		} while (salt == null);
 	}
 
 	private void setPasswordConfig() {
 		Configurations configurations = xmlReader.loadConfigFile();
-		Map<Permission, Object> permissions = configurations.getConfigurations(permissionsValue);
+		Map<Permission, Object> permissions = configurations.getConfigurations(PERMISSIONS_VALUE);
 		this.passwordConfig = (PasswordConfig) permissions.get(Permission.PASSWORD);
 	}
 
@@ -141,6 +145,10 @@ public class PasswordManager {
 	private boolean validateLoginAttempts(int numberOfLoginAttempts) {
 		return (numberOfLoginAttempts <= this.passwordConfig.getLoginAttempts());
 	}
-
+	
+	public String generateRandomPassword() {
+		RgxGen rgxGen = new RgxGen(this.passwordConfig.getSymbols());
+		return rgxGen.generate().replaceAll("\\s+", "").substring(0, this.passwordConfig.getLength());
+	}
 
 }
