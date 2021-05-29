@@ -11,6 +11,6 @@ import lombok.experimental.SuperBuilder;
 @Getter
 @Setter
 @SuperBuilder
-public class UserBoundaryBase {
-	private String username;
+public class ClientBoundaryBase {
+	private String clientName;
 }

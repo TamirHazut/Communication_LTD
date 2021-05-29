@@ -1,6 +1,6 @@
 package demo.logic.exceptions;
 
-public class InvalidFileException extends RuntimeException {
+public class InvalidFileException extends InternalErrorException {
 	/**
 	 * 
 	 */

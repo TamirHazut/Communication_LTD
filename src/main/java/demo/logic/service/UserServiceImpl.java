@@ -11,6 +11,7 @@ import java.util.stream.Collectors;
 
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
+import javax.persistence.Query;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -18,6 +19,12 @@ import org.springframework.context.event.EventListener;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort.Direction;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
+
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 
 import demo.boundary.UserBoundaryBase;
 import demo.boundary.UserBoundaryBaseWithPassword;
@@ -52,12 +59,16 @@ public class UserServiceImpl implements UserService {
 	@PersistenceContext
 	private @NonNull EntityManager entityManager;
 	private @NonNull MailService emailService;
+	private @NonNull PlatformTransactionManager transactionManager;
+	private @NonNull TransactionTemplate transactionTemplate;
+	private Gson gson;
 
 	@EventListener(ApplicationReadyEvent.class)
 	private void init() {
 		Configurations configurations = xmlReader.loadConfigFile();
 		Map<Permission, Object> permissions = configurations.getConfigurations(PERMISSIONS_VALUE);
 		this.generalConfig = (GeneralConfig) permissions.get(Permission.GENERAL);
+		this.gson = new Gson();
 	}
 
 	@Override
@@ -77,9 +88,10 @@ public class UserServiceImpl implements UserService {
 			UserEntity entity = UserEntity.builder().username(userBoundary.getUsername())
 					.password(new String(hash, PasswordManager.BYTE_CHARSET))
 					.salt(new String(salt, PasswordManager.BYTE_CHARSET)).email(userBoundary.getEmail())
-					.numberOfLoginAttempt(0).creationTimestamp(new Date()).oldPasswords(oldPasswords).build();
+					.numberOfLoginAttempt(0).creationTimestamp(new Date()).oldPasswords(this.gson.toJson(oldPasswords))
+					.build();
 
-			saveUser(entity, true);
+			saveUser(entity);
 			return UserBoundaryBase.builder().username(userBoundary.getUsername()).build();
 		} catch (UnsupportedEncodingException | InvalidKeySpecException | NoSuchAlgorithmException e) {
 			e.printStackTrace();
@@ -93,25 +105,25 @@ public class UserServiceImpl implements UserService {
 	@Override
 	public UserBoundaryBase login(UserBoundaryBaseWithPassword userBoundary) {
 		// Check if user exists
-		UserEntity entity = getUser(userBoundary.getUsername());
+		UserEntity entity = findByUsernameAndPassword(userBoundary);
 		// Validate user credentials
-		if (!this.passwordManager.validatePasswordForLogin(userBoundary, entity)) {
+		if (!this.passwordManager.validateLogin(userBoundary, entity)) {
 			// login failed, saving changes
 			entity.setNumberOfLoginAttempt(entity.getNumberOfLoginAttempt() + 1);
-			saveUser(entity, false);
+			updateUser(entity);
 			throw new InvalidUsernameOrPasswordException();
 		}
 		// login succeeded, saving changes
 		entity.setNumberOfLoginAttempt(0);
-		saveUser(entity, false);
+		updateUser(entity);
 		return UserBoundaryBase.builder().username(userBoundary.getUsername()).build();
 	}
 
 	@Override
 	public UserBoundaryBase changePassword(UserBoundaryPasswordChange userBoundary) {
-		UserEntity entity = getUser(userBoundary.getUsername());
+		UserEntity entity = findByUsername(userBoundary.getUsername());
 		// Check if password entered is correct
-		if (!this.passwordManager.validatePasswordForLogin(userBoundary, entity)) {
+		if (!this.passwordManager.validateLogin(userBoundary, entity)) {
 			throw new InvalidPasswordException("Password entered does not match");
 		}
 		// Check if new password is valid
@@ -124,13 +136,14 @@ public class UserServiceImpl implements UserService {
 
 	@Override
 	public UserBoundaryBase forgotPassword(UserBoundaryBase userBoundary) {
-		UserEntity userEntity = getUser(userBoundary.getUsername());
+		UserEntity userEntity = findByUsername(userBoundary.getUsername());
 		UserBoundaryPasswordChange userBoundaryPasswordChange = UserBoundaryPasswordChange
 				.userWithOldAndNewPasswordsBuilder().username(userBoundary.getUsername())
 				.password(userBoundary.getUsername()).newPassword(this.passwordManager.generateRandomPassword())
 				.build();
 		resetUserPassword(userBoundaryPasswordChange, userEntity);
-		this.emailService.sendResetPasswordMail(userEntity.getEmail(), Constants.RESET_PASSWORD, userBoundaryPasswordChange.getNewPassword());
+		this.emailService.sendResetPasswordMail(userEntity.getEmail(), Constants.RESET_PASSWORD,
+				userBoundaryPasswordChange.getNewPassword());
 		return userBoundaryPasswordChange;
 	}
 
@@ -153,16 +166,17 @@ public class UserServiceImpl implements UserService {
 					entity.getSalt().getBytes(PasswordManager.BYTE_CHARSET));
 			String newPassword = new String(newHash, PasswordManager.BYTE_CHARSET);
 			// Update old passwords list
-			List<String> oldPasswords = entity.getOldPasswords();
+			List<String> oldPasswords = this.gson.fromJson(entity.getOldPasswords(), new TypeToken<List<String>>() {
+			}.getType());
 			if (oldPasswords.size() == this.passwordManager.getPasswordConfig().getHistory()) {
 				oldPasswords.remove(0);
 			}
 			oldPasswords.add(newPassword);
 			// Save the changes
 			entity.setPassword(newPassword);
-			entity.setOldPasswords(oldPasswords);
+			entity.setOldPasswords(this.gson.toJson(oldPasswords));
 			entity.setNumberOfLoginAttempt(0);
-			saveUser(entity, false);
+			updateUser(entity);
 			return UserBoundaryBase.builder().username(userBoundary.getUsername()).build();
 		} catch (UnsupportedEncodingException | NoSuchAlgorithmException | InvalidKeySpecException e) {
 			e.printStackTrace();
@@ -171,48 +185,128 @@ public class UserServiceImpl implements UserService {
 	}
 
 	private boolean isUsernameExists(String username) {
-		UserEntity userEntity;
-		if (this.generalConfig.isSecure()) {
-			return this.userRepository.existsById(username);
+		try {
+			return findByUsername(username) != null;
+		} catch (Exception ex) {
+			return false;
 		}
-		String sqlQueryAsString = "SELECT id FROM users WHERE id = " + username + " limit 1;";
-		userEntity = (UserEntity) this.entityManager.createNativeQuery(sqlQueryAsString, UserEntity.class)
-				.getSingleResult();
-		return userEntity != null;
 	}
 
-	private UserEntity getUser(String username) {
-		UserEntity userEntity;
-		if (this.generalConfig.isSecure()) {
-			return this.userRepository.findById(username).orElseThrow(() -> new InvalidUsernameOrPasswordException());
+	private UserEntity findByUsername(String username) {
+		try {
+			Query query;
+			if (this.generalConfig.isSecure()) {
+				String sqlQueryAsString = "SELECT * FROM users WHERE username = :username";
+				query = this.entityManager.createNativeQuery(sqlQueryAsString, UserEntity.class)
+						.setParameter("username", username);
+			} else {
+				String sqlQueryAsString = "SELECT * FROM users WHERE username = '" + username + "'";
+				query = this.entityManager.createNativeQuery(sqlQueryAsString, UserEntity.class);
+			}
+			return (UserEntity) query.getResultList().get(0);
+		} catch (Exception ex) {
+			throw new InvalidUsernameOrPasswordException();
 		}
-		String sqlQueryAsString = "SELECT id FROM users WHERE id = " + username + " limit 1;";
-		userEntity = (UserEntity) this.entityManager.createNativeQuery(sqlQueryAsString, UserEntity.class)
-				.getSingleResult();
-		return userEntity;
 	}
 
-	private UserEntity saveUser(UserEntity userEntity, boolean newUser) {
-		if (this.generalConfig.isSecure()) {
-			return this.userRepository.save(userEntity);
+	private UserEntity findByUsernameAndPassword(UserBoundaryBaseWithPassword boundary) {
+		try {
+			Query query;
+			String sqlQueryAsString;
+			// Check if user exists first
+			UserEntity userEntity = findByUsername(boundary.getUsername());
+			// Validating the users password
+			String password = new String(
+					this.passwordManager.encrypt(boundary.getPassword(), userEntity.getSalt().getBytes("ISO-8859-1")),
+					"ISO-8859-1");
+			if (this.generalConfig.isSecure()) {
+				sqlQueryAsString = "SELECT * FROM users WHERE username = :username AND password = :password";
+				query = this.entityManager.createNativeQuery(sqlQueryAsString, UserEntity.class)
+						.setParameter("username", userEntity.getUsername()).setParameter("password", password);
+			} else {
+				sqlQueryAsString = "SELECT * FROM users WHERE username = '" + boundary.getUsername()
+						+ "' AND password = :password";
+				query = this.entityManager.createNativeQuery(sqlQueryAsString, UserEntity.class)
+						.setParameter("password", password);
+			}
+			return (UserEntity) query.getResultList().get(0);
+		} catch (Exception ex) {
+			ex.printStackTrace();
+			throw new InvalidUsernameOrPasswordException();
 		}
-		String sqlQueryAsString;
-		if (newUser) {
-			sqlQueryAsString = "INSERT INTO users (username, creation_timestamp, email, number_of_login_attempt, password, salt, old_passwords)"
-					+ "VALUES(" + userEntity.getUsername() + "," + userEntity.getCreationTimestamp() + ","
-					+ userEntity.getEmail() + "," + userEntity.getNumberOfLoginAttempt() + ","
-					+ userEntity.getPassword() + "," + userEntity.getSalt() + "," + userEntity.getOldPasswords() + ");";
-		} else {
-			sqlQueryAsString = "UPDATE users" + "SET username = " + userEntity.getUsername() + ","
-					+ "SET creation_timestamp = " + userEntity.getCreationTimestamp() + "," + "SET email = "
-					+ userEntity.getEmail() + "," + "SET number_of_login_attempt = "
-					+ userEntity.getNumberOfLoginAttempt() + "," + "SET password = " + userEntity.getPassword() + ","
-					+ "SET salt = " + userEntity.getSalt() + "," + "SET old_passwords = " + userEntity.getOldPasswords()
-					+ "WHERE id = " + userEntity.getUsername() + ";";
+	}
+
+	@Transactional
+	private void updateUser(UserEntity userEntity) {
+		try {
+			this.transactionTemplate = new TransactionTemplate(this.transactionManager);
+			this.transactionTemplate.execute(transactionStatus -> {
+				String sqlQueryAsString;
+				Query query;
+//				if (this.generalConfig.isSecure()) {
+				sqlQueryAsString = "UPDATE users SET number_of_login_attempt = :number_of_login_attempt, password = :password, "
+						+ "old_passwords = :old_passwords WHERE username = :username";
+				query = this.entityManager.createNativeQuery(sqlQueryAsString, UserEntity.class)
+						.setParameter("number_of_login_attempt", userEntity.getNumberOfLoginAttempt())
+						.setParameter("password", userEntity.getPassword())
+						.setParameter("old_passwords", userEntity.getOldPasswords())
+						.setParameter("username", userEntity.getUsername());
+//				} else {
+//					sqlQueryAsString = "UPDATE users SET number_of_login_attempt = "
+//							+ userEntity.getNumberOfLoginAttempt() + ", " + "password = '" + userEntity.getPassword()
+//							+ "', " + "old_passwords = '" + userEntity.getOldPasswords() + "' WHERE username = '"
+//							+ userEntity.getUsername() + "'";
+//					query = this.entityManager.createNativeQuery(sqlQueryAsString, UserEntity.class);
+//				}
+				query.executeUpdate();
+				transactionStatus.flush();
+				return null;
+			});
+		} catch (Exception ex) {
+			ex.printStackTrace();
+			throw new InternalErrorException("Something went wrong");
 		}
-		userEntity = (UserEntity) this.entityManager.createNativeQuery(sqlQueryAsString, UserEntity.class)
-				.getSingleResult();
-		return userEntity;
+	}
+
+	@Transactional
+	private void saveUser(UserEntity userEntity) {
+		try {
+			this.transactionTemplate = new TransactionTemplate(this.transactionManager);
+			this.transactionTemplate.execute(transactionStatus -> {
+				String sqlQueryAsString;
+				Query query;
+				if (this.generalConfig.isSecure()) {
+					sqlQueryAsString = "INSERT INTO users (username, creation_timestamp, email, number_of_login_attempt, password, salt, old_passwords)"
+							+ " VALUES(:username, :creation_timestamp, :email, :number_of_login_attempt, :password, :salt, :old_passwords)";
+					query = this.entityManager.createNativeQuery(sqlQueryAsString, UserEntity.class)
+							.setParameter("username", userEntity.getUsername())
+							.setParameter("creation_timestamp", userEntity.getCreationTimestamp())
+							.setParameter("email", userEntity.getEmail())
+							.setParameter("number_of_login_attempt", userEntity.getNumberOfLoginAttempt())
+							.setParameter("password", userEntity.getPassword())
+							.setParameter("salt", userEntity.getSalt())
+							.setParameter("old_passwords", userEntity.getOldPasswords());
+
+				} else {
+					sqlQueryAsString = "INSERT INTO users (username, creation_timestamp, email, number_of_login_attempt, password, salt, old_passwords)"
+							+ " VALUES('" + userEntity.getUsername()
+							+ "', :creation_timestamp, :email, :number_of_login_attempt, :password, :salt, :old_passwords)";
+					query = this.entityManager.createNativeQuery(sqlQueryAsString, UserEntity.class)
+							.setParameter("creation_timestamp", userEntity.getCreationTimestamp())
+							.setParameter("number_of_login_attempt", userEntity.getNumberOfLoginAttempt())
+							.setParameter("password", userEntity.getPassword())
+							.setParameter("salt", userEntity.getSalt())
+							.setParameter("old_passwords", userEntity.getOldPasswords())
+							.setParameter("username", userEntity.getUsername());
+				}
+				query.executeUpdate();
+				transactionStatus.flush();
+				return null;
+			});
+		} catch (Exception ex) {
+			ex.printStackTrace();
+			throw new InternalErrorException("Something went wrong");
+		}
 	}
 
 }

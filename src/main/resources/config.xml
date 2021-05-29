@@ -8,13 +8,13 @@
 		<database>Communication_LTD</database>
 	</db>
 	<general>
-		<secure>true</secure>
+		<secure>false</secure>
 	</general>
 	<mail>
 		<host>smtp.gmail.com</host>
 		<port>587</port>
 		<username>communicationltdproject@gmail.com</username>
-		<password>Your Password</password>
+		<password>Your_Password</password>
 		<from>no-reply@communicationltd.com</from>
 		<resetPasswordHTMLTemplateFile>reset-password-message-template.ftlh</resetPasswordHTMLTemplateFile>
 	</mail>

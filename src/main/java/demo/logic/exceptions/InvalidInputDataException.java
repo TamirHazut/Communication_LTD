@@ -1,6 +1,6 @@
 package demo.logic.exceptions;
 
-public class InvalidInputDataException extends RuntimeException {
+public class InvalidInputDataException extends BadRequestException {
 
 	/**
 	 * 

@@ -1,6 +1,6 @@
 package demo.logic.exceptions;
 
-public class InvalidPasswordException extends RuntimeException {
+public class InvalidPasswordException extends BadRequestException {
 
 	/**
 	 * 

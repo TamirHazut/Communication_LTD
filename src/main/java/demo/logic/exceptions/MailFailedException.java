@@ -1,6 +1,6 @@
 package demo.logic.exceptions;
 
-public class MailFailedException extends RuntimeException {
+public class MailFailedException extends InternalErrorException {
 
 	/**
 	 * 

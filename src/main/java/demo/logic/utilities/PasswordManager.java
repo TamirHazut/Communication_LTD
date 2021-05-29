@@ -10,6 +10,7 @@ import java.security.SecureRandom;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.KeySpec;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -24,6 +25,8 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
 import com.github.curiousoddman.rgxgen.RgxGen;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 
 import demo.boundary.UserBoundaryBaseWithPassword;
 import demo.boundary.UserBoundaryPasswordChange;
@@ -31,7 +34,6 @@ import demo.config.Configurations;
 import demo.config.PasswordConfig;
 import demo.config.Permission;
 import demo.data.UserEntity;
-import demo.data.repository.UserRepository;
 import demo.logic.exceptions.InvalidFileException;
 import lombok.Getter;
 import lombok.NonNull;
@@ -42,23 +44,25 @@ import lombok.RequiredArgsConstructor;
 public class PasswordManager {
 	public static final String BYTE_CHARSET = "ISO-8859-1";
 	private final long PERMISSIONS_VALUE = Permission.PASSWORD.getId();
-	@Getter private PasswordConfig passwordConfig;
+	@Getter
+	private PasswordConfig passwordConfig;
 	private @NonNull XMLReader xmlReader;
-	private @NonNull UserRepository userRepository;
+	private Gson gson;
 	private SecureRandom random;
 
 	@EventListener(ApplicationReadyEvent.class)
 	private void init() {
 		this.setPasswordConfig();
 		this.random = new SecureRandom();
+		this.gson = new Gson();
 	}
-	
+
 	public byte[] encrypt(String password, byte[] salt) throws NoSuchAlgorithmException, InvalidKeySpecException {
 		KeySpec spec = new PBEKeySpec(password.toCharArray(), salt, 65536, 128);
 		SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA1");
 		return factory.generateSecret(spec).getEncoded();
 	}
-	
+
 	public void generateSaltValue(byte[] salt) {
 		do {
 			random.nextBytes(salt);
@@ -76,28 +80,14 @@ public class PasswordManager {
 				&& validateSymbols(userBoundary.getPassword()) && validateDictionary(userBoundary));
 	}
 
-	public boolean validatePasswordForLogin(UserBoundaryBaseWithPassword userBoundary, UserEntity userEntity) {
-		try {
-			/*
-			 * charset need to be "ISO-8859-1" in order to keep 1-1 conversion byte[] ->
-			 * String: new String(byte[], "ISO-8859-1") String -> byte[]:
-			 * String.getBytes("ISO-8859-1")
-			 */
-			byte[] salt = userEntity.getSalt().getBytes(BYTE_CHARSET);
-			byte[] hash = encrypt(userBoundary.getPassword(), salt);
-			return (validatePasswordForSignup(userBoundary)
-					&& validateLoginAttempts(userEntity.getNumberOfLoginAttempt())
-					&& Arrays.equals(hash, userEntity.getPassword().getBytes(BYTE_CHARSET)));
-		} catch (UnsupportedEncodingException | InvalidKeySpecException | NoSuchAlgorithmException e) {
-			e.printStackTrace();
-			return false;
-		}
+	public boolean validateLogin(UserBoundaryBaseWithPassword userBoundary, UserEntity userEntity) {
+		return (validatePasswordForSignup(userBoundary) && validateLoginAttempts(userEntity.getNumberOfLoginAttempt()));
 	}
 
 	public boolean validatePasswordForChangePassword(UserBoundaryPasswordChange userBoundary, UserEntity entity) {
 		return validatePasswordForSignup(userBoundary) && validateHistory(userBoundary, entity);
 	}
-	
+
 	private boolean validateLength(String password) {
 		return (password.length() >= this.passwordConfig.getLength());
 	}
@@ -113,7 +103,8 @@ public class PasswordManager {
 			byte[] salt = entity.getSalt().getBytes(BYTE_CHARSET);
 			byte[] newPasswordHash = encrypt(userBoundary.getNewPassword(), salt);
 			byte[] oldPasswordHash;
-			for (String oldPassword : entity.getOldPasswords()) {
+			List<String> oldPasswords = gson.fromJson(entity.getOldPasswords(), new TypeToken<List<String>>(){}.getType());
+			for (String oldPassword : oldPasswords) {
 				oldPasswordHash = oldPassword.getBytes(BYTE_CHARSET);
 				if (Arrays.equals(newPasswordHash, oldPasswordHash)) {
 					return false;
@@ -145,7 +136,7 @@ public class PasswordManager {
 	private boolean validateLoginAttempts(int numberOfLoginAttempts) {
 		return (numberOfLoginAttempts <= this.passwordConfig.getLoginAttempts());
 	}
-	
+
 	public String generateRandomPassword() {
 		RgxGen rgxGen = new RgxGen(this.passwordConfig.getSymbols());
 		return rgxGen.generate().replaceAll("\\s+", "").substring(0, this.passwordConfig.getLength());

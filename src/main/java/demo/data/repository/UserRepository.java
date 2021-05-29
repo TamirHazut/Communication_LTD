@@ -4,6 +4,6 @@ import org.springframework.data.repository.PagingAndSortingRepository;
 
 import demo.data.UserEntity;
 
-public interface UserRepository extends PagingAndSortingRepository<UserEntity, String> {
+public interface UserRepository extends PagingAndSortingRepository<UserEntity, String>{
 
 }
